@@ -23,6 +23,27 @@ targets:
       - path: Resources/Assets.xcassets
     info:
       path: Fiscal-Info.plist
+      properties:
+        CFBundleDisplayName: Fiscal
+        CFBundleURLTypes:
+          - CFBundleURLName: com.aadya.Fiscal.quick-add
+            CFBundleURLSchemes:
+              - fiscal
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemIconSymbolName: plus.circle.fill
+            UIApplicationShortcutItemTitle: Add Expense
+            UIApplicationShortcutItemType: com.aadya.Fiscal.quick-add.new
+        UIDesignRequiresCompatibility: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aadya.Fiscal
@@ -44,6 +65,10 @@ targets:
       - path: Sources/FiscalWidget
     info:
       path: FiscalWidget-Info.plist
+      properties:
+        CFBundleDisplayName: Fiscal
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aadya.Fiscal.FiscalWidget
