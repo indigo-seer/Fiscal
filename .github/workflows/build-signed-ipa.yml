@@ -147,6 +147,12 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
 
           test -f "$RUNNER_TEMP/FiscalExport/Fiscal.ipa"
+          /usr/libexec/PlistBuddy \
+            -c 'Print :UILaunchScreen' \
+            "$RUNNER_TEMP/Fiscal.xcarchive/Products/Applications/Fiscal.app/Info.plist"
+          /usr/libexec/PlistBuddy \
+            -c 'Print :UIDeviceFamily:0' \
+            "$RUNNER_TEMP/Fiscal.xcarchive/Products/Applications/Fiscal.app/Info.plist" | grep -qx '1'
           codesign --verify --deep --strict "$RUNNER_TEMP/Fiscal.xcarchive/Products/Applications/Fiscal.app"
           codesign -dvv "$RUNNER_TEMP/Fiscal.xcarchive/Products/Applications/Fiscal.app/PlugIns/FiscalWidget.appex"
 

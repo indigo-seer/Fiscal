@@ -29,9 +29,6 @@
     <key>UIDesignRequiresCompatibility</key>
     <false/>
     <key>UILaunchScreen</key>
-    <dict>
-        <key>UIColorName</key>
-        <string></string>
-    </dict>
+    <dict/>
 </dict>
 </plist>
