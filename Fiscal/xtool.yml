@@ -1,0 +1,10 @@
+version: 1
+bundleID: com.aadya.Fiscal
+product: Fiscal
+infoPath: Fiscal-Info.plist
+iconPath: Resources/Assets.xcassets/AppIcon.appiconset/FiscalIcon.png
+resources:
+  - Metadata.appintents
+extensions:
+  - product: FiscalWidget
+    infoPath: FiscalWidget-Info.plist

@@ -1,0 +1,166 @@
+name: Build signed Fiscal IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      export_method:
+        description: Signing/export method matching the provisioning profiles
+        required: true
+        default: debugging
+        type: choice
+        options:
+          - debugging
+          - release-testing
+          - app-store-connect
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fiscal-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  archive:
+    name: Archive and export
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SIGNING_IDENTITY: ${{ vars.CODE_SIGN_IDENTITY || 'Apple Development' }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select Xcode and install XcodeGen
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Validate signing secrets
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          APP_PROVISION_PROFILE_BASE64: ${{ secrets.APP_PROVISION_PROFILE_BASE64 }}
+          WIDGET_PROVISION_PROFILE_BASE64: ${{ secrets.WIDGET_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          missing=0
+          for name in BUILD_CERTIFICATE_BASE64 P12_PASSWORD APP_PROVISION_PROFILE_BASE64 WIDGET_PROVISION_PROFILE_BASE64 KEYCHAIN_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Import certificate and provisioning profiles
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          APP_PROVISION_PROFILE_BASE64: ${{ secrets.APP_PROVISION_PROFILE_BASE64 }}
+          WIDGET_PROVISION_PROFILE_BASE64: ${{ secrets.WIDGET_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/fiscal-signing.p12"
+          APP_PROFILE_PATH="$RUNNER_TEMP/fiscal-app.mobileprovision"
+          WIDGET_PROFILE_PATH="$RUNNER_TEMP/fiscal-widget.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/fiscal-signing.keychain-db"
+
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          printf '%s' "$APP_PROVISION_PROFILE_BASE64" | base64 --decode > "$APP_PROFILE_PATH"
+          printf '%s' "$WIDGET_PROVISION_PROFILE_BASE64" | base64 --decode > "$WIDGET_PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          install_profile() {
+            profile_path="$1"
+            output_prefix="$2"
+            decoded_path="$RUNNER_TEMP/$output_prefix.plist"
+            security cms -D -i "$profile_path" > "$decoded_path"
+            profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$decoded_path")
+            profile_name=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$decoded_path")
+            cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+            echo "${output_prefix}_PROFILE_NAME=$profile_name" >> "$GITHUB_ENV"
+          }
+
+          install_profile "$APP_PROFILE_PATH" FISCAL_APP
+          install_profile "$WIDGET_PROFILE_PATH" FISCAL_WIDGET
+          echo "FISCAL_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Generate native Xcode project
+        working-directory: Fiscal
+        run: xcodegen generate
+
+      - name: Archive signed app and widget
+        working-directory: Fiscal
+        run: |
+          xcodebuild \
+            -project Fiscal.xcodeproj \
+            -scheme Fiscal \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Fiscal.xcarchive" \
+            archive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+            FISCAL_APP_PROFILE_NAME="$FISCAL_APP_PROFILE_NAME" \
+            FISCAL_WIDGET_PROFILE_NAME="$FISCAL_WIDGET_PROFILE_NAME" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
+
+      - name: Create export options
+        env:
+          EXPORT_METHOD: ${{ inputs.export_method || 'debugging' }}
+        run: |
+          EXPORT_OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c 'Clear dict' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c "Add :method string $EXPORT_METHOD" "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c "Add :teamID string $APPLE_TEAM_ID" "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :signingStyle string manual' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c "Add :signingCertificate string $SIGNING_IDENTITY" "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.aadya.Fiscal string $FISCAL_APP_PROFILE_NAME" "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.aadya.Fiscal.FiscalWidget string $FISCAL_WIDGET_PROFILE_NAME" "$EXPORT_OPTIONS"
+          plutil -lint "$EXPORT_OPTIONS"
+
+      - name: Export signed IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/FiscalExport"
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/Fiscal.xcarchive" \
+            -exportPath "$RUNNER_TEMP/FiscalExport" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+
+          test -f "$RUNNER_TEMP/FiscalExport/Fiscal.ipa"
+          codesign --verify --deep --strict "$RUNNER_TEMP/Fiscal.xcarchive/Products/Applications/Fiscal.app"
+          codesign -dvv "$RUNNER_TEMP/Fiscal.xcarchive/Products/Applications/Fiscal.app/PlugIns/FiscalWidget.appex"
+
+      - name: Upload signed IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fiscal-signed-${{ github.run_number }}
+          path: ${{ runner.temp }}/FiscalExport/Fiscal.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove temporary signing keychain
+        if: always()
+        run: |
+          if [ -n "${FISCAL_KEYCHAIN_PATH:-}" ] && [ -f "$FISCAL_KEYCHAIN_PATH" ]; then
+            security delete-keychain "$FISCAL_KEYCHAIN_PATH"
+          fi

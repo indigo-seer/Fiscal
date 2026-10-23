@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Fiscal</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.aadya.Fiscal.quick-add</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>fiscal</string>
+            </array>
+        </dict>
+    </array>
+    <key>UIApplicationShortcutItems</key>
+    <array>
+        <dict>
+            <key>UIApplicationShortcutItemIconSymbolName</key>
+            <string>plus.circle.fill</string>
+            <key>UIApplicationShortcutItemTitle</key>
+            <string>Add Expense</string>
+            <key>UIApplicationShortcutItemType</key>
+            <string>com.aadya.Fiscal.quick-add.new</string>
+        </dict>
+    </array>
+    <key>UIDesignRequiresCompatibility</key>
+    <false/>
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string></string>
+    </dict>
+</dict>
+</plist>

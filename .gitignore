@@ -1,0 +1,26 @@
+# Local toolchains and xtool installation files
+/.swiftly/
+/arch-packages/
+/arch-swift/
+/compat-libs/
+/squashfs-root/
+/swiftly-*.tar.gz
+/xtool.AppImage
+/xtool-local
+
+# Build products and generated IDE files
+**/.build/
+**/.bsp/
+**/xtool/
+**/DerivedData/
+**/*.xcarchive
+**/*.ipa
+**/*.xcodeproj/
+
+# Signing material must never be committed
+*.cer
+*.p12
+*.mobileprovision
+
+.DS_Store
+xcuserdata/

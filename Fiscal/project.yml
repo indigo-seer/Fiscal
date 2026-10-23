@@ -1,0 +1,68 @@
+name: Fiscal
+
+options:
+  bundleIdPrefix: com.aadya
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+
+settings:
+  base:
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0.0
+    SWIFT_VERSION: 6.0
+    IPHONEOS_DEPLOYMENT_TARGET: 26.0
+
+targets:
+  Fiscal:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/Fiscal
+      - path: Resources/Assets.xcassets
+    info:
+      path: Fiscal-Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aadya.Fiscal
+        PRODUCT_NAME: Fiscal
+        PRODUCT_MODULE_NAME: Fiscal
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Manual
+        PROVISIONING_PROFILE_SPECIFIER: "$(FISCAL_APP_PROFILE_NAME)"
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_EMIT_LOC_STRINGS: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+    dependencies:
+      - target: FiscalWidget
+
+  FiscalWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/FiscalWidget
+    info:
+      path: FiscalWidget-Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aadya.Fiscal.FiscalWidget
+        PRODUCT_NAME: FiscalWidget
+        PRODUCT_MODULE_NAME: FiscalWidget
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_STYLE: Manual
+        PROVISIONING_PROFILE_SPECIFIER: "$(FISCAL_WIDGET_PROFILE_NAME)"
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+
+schemes:
+  Fiscal:
+    build:
+      targets:
+        Fiscal: all
+    run:
+      config: Debug
+    archive:
+      config: Release
