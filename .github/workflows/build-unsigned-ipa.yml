@@ -1,0 +1,75 @@
+name: Build unsigned Fiscal IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fiscal-unsigned-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build app and widget
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select Xcode and install XcodeGen
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate native Xcode project
+        working-directory: Fiscal
+        run: xcodegen generate
+
+      - name: Build unsigned Release app
+        working-directory: Fiscal
+        run: |
+          xcodebuild \
+            -project Fiscal.xcodeproj \
+            -scheme Fiscal \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/FiscalDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            PROVISIONING_PROFILE_SPECIFIER='' \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            build
+
+      - name: Verify and package IPA
+        run: |
+          APP_PATH="$RUNNER_TEMP/FiscalDerivedData/Build/Products/Release-iphoneos/Fiscal.app"
+          WIDGET_PATH="$APP_PATH/PlugIns/FiscalWidget.appex"
+          PACKAGE_PATH="$RUNNER_TEMP/FiscalUnsigned"
+          IPA_PATH="$RUNNER_TEMP/Fiscal-unsigned.ipa"
+
+          test -x "$APP_PATH/Fiscal"
+          test -d "$WIDGET_PATH"
+          test -x "$WIDGET_PATH/FiscalWidget"
+
+          mkdir -p "$PACKAGE_PATH/Payload"
+          ditto "$APP_PATH" "$PACKAGE_PATH/Payload/Fiscal.app"
+          cd "$PACKAGE_PATH"
+          /usr/bin/zip -qry "$IPA_PATH" Payload
+          test -s "$IPA_PATH"
+
+          /usr/bin/unzip -l "$IPA_PATH" | grep 'Payload/Fiscal.app/PlugIns/FiscalWidget.appex/'
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fiscal-unsigned-${{ github.run_number }}
+          path: ${{ runner.temp }}/Fiscal-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
